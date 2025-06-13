@@ -220,14 +220,9 @@
         function blockDevTools() {
             if (!devToolsOpen) {
                 devToolsOpen = true;
-                
-                // إضافة المستخدم لقائمة الحظر
-                const banId = addToBanList('devtools_detected');
-                
                 DevToolsLogger.addLog('blocked', {
                     method: 'automatic_block',
-                    zoom: getAccurateZoomLevel(),
-                    banId: banId
+                    zoom: getAccurateZoomLevel()
                 });
                 
                 document.body.innerHTML = `
@@ -236,9 +231,9 @@
                         <h2>⚠️ ACCESS DENIED</h2>
                         <p>Developer tools detected!</p>
                         <p>This content is protected.</p>
-                        <p><strong>You have been permanently banned from this website!</strong></p>
-                        <p><small>Ban ID: ${banId}</small></p>
-                        <p><small>Reason: Developer Tools Detection</small></p>
+                        <p>Please close developer tools to continue.</p>
+                        <p><small>Refresh the page after closing dev tools</small></p>
+                        <p><small>If zoom is 125%+, try reducing zoom level</small></p>
                         <p><small>Current zoom: ${getAccurateZoomLevel()}%</small></p>
                     </div>
                 `;
@@ -246,16 +241,9 @@
                 // تنظيف وحدة التحكم
                 if (typeof console !== 'undefined') {
                     console.clear();
-                    console.log('%cBANNED!', 'color: red; font-size: 50px; font-weight: bold;');
-                    console.log('%cYou have been permanently banned from this website.', 'color: red; font-size: 16px;');
-                    console.log('%cBan ID: ' + banId, 'color: red; font-size: 16px;');
+                    console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold;');
+                    console.log('%cThis is a browser feature intended for developers. Content is protected.', 'color: red; font-size: 16px;');
                 }
-                
-                // منع إعادة تحميل الصفحة
-                window.addEventListener('beforeunload', function(e) {
-                    e.preventDefault();
-                    return 'You are banned from this website';
-                });
             }
         }
 
@@ -351,399 +339,6 @@
             return false;
         });
 
-        // منع لقطات الشاشة - Screen Ban
-        let screenshotAttempts = 0;
-        
-        // كشف محاولات لقطة الشاشة
-        function detectScreenshot() {
-            // كشف اختصارات لقطة الشاشة
-            document.addEventListener('keydown', function(e) {
-                const screenshotShortcuts = [
-                    { key: 44, name: 'Print Screen' }, // Print Screen
-                    { key: 19, name: 'Pause/Break' }, // Pause/Break (Alt+Print Screen)
-                    { ctrl: true, shift: true, key: 83, name: 'Ctrl+Shift+S' }, // Chrome screenshot
-                    { cmd: true, shift: true, key: 51, name: 'Cmd+Shift+3' }, // Mac screenshot
-                    { cmd: true, shift: true, key: 52, name: 'Cmd+Shift+4' }, // Mac area screenshot
-                    { cmd: true, shift: true, key: 53, name: 'Cmd+Shift+5' }, // Mac screenshot options
-                    { win: true, shift: true, key: 83, name: 'Win+Shift+S' }, // Windows Snip & Sketch
-                    { win: true, key: 44, name: 'Win+Print Screen' } // Windows screenshot
-                ];
-                
-                for (let shortcut of screenshotShortcuts) {
-                    if (shortcut.key === e.keyCode && 
-                        (!shortcut.ctrl || e.ctrlKey) && 
-                        (!shortcut.shift || e.shiftKey) &&
-                        (!shortcut.cmd || e.metaKey) &&
-                        (!shortcut.win || e.metaKey)) {
-                        
-                        e.preventDefault();
-                        e.stopPropagation();
-                        screenshotAttempts++;
-                        
-                        DevToolsLogger.addLog('screenshot_blocked', {
-                            shortcut: shortcut.name,
-                            keyCode: e.keyCode,
-                            attempts: screenshotAttempts
-                        });
-                        
-                        // إظهار تحذير وحظر الصفحة
-                        blockScreenshot();
-                        return false;
-                    }
-                }
-            });
-        }
-
-        // حظر الصفحة عند محاولة لقطة شاشة
-        function blockScreenshot() {
-            // إضافة المستخدم لقائمة الحظر
-            addToBanList('screenshot_attempt');
-            
-            document.body.innerHTML = `
-                <div class="blocked">
-                    <h11>Block By ZAKARIA0_DZ</h11>
-                    <h2>🚫 SCREENSHOT BLOCKED</h2>
-                    <p>Screenshot attempt detected!</p>
-                    <p>This content is protected from screenshots.</p>
-                    <p>Screenshot attempts: ${screenshotAttempts}</p>
-                    <p><small>You have been permanently banned from this website</small></p>
-                    <p><small>Ban ID: ${generateBanId()}</small></p>
-                </div>
-            `;
-            
-            // تعطيل جميع الوظائف
-            document.addEventListener('keydown', function(e) {
-                e.preventDefault();
-                return false;
-            });
-            
-            document.addEventListener('contextmenu', function(e) {
-                e.preventDefault();
-                return false;
-            });
-            
-            // منع إعادة تحميل الصفحة
-            window.addEventListener('beforeunload', function(e) {
-                e.preventDefault();
-                return false;
-            });
-        }
-
-        // حماية من Print Screen باستخدام Clipboard API
-        function preventPrintScreen() {
-            // مراقبة الحافظة
-            if (navigator.clipboard && navigator.clipboard.readText) {
-                setInterval(async function() {
-                    try {
-                        const clipboardText = await navigator.clipboard.readText();
-                        // فحص إذا كان هناك محتوى جديد غير متوقع في الحافظة
-                        if (clipboardText && clipboardText.length > 100) {
-                            DevToolsLogger.addLog('clipboard_suspicious', {
-                                length: clipboardText.length,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    } catch (e) {
-                        // تجاهل الأخطاء
-                    }
-                }, 2000);
-            }
-        }
-
-        // حماية من أدوات الالتقاط الخارجية
-        function preventExternalCapture() {
-            // إخفاء المحتوى عند فقدان التركيز
-            window.addEventListener('blur', function() {
-                document.body.style.filter = 'blur(10px)';
-                document.body.style.opacity = '0.1';
-                
-                DevToolsLogger.addLog('window_blur', {
-                    reason: 'potential_screenshot_tool',
-                    timestamp: new Date().toISOString()
-                });
-            });
-            
-            // إظهار المحتوى عند العودة للتركيز
-            window.addEventListener('focus', function() {
-                document.body.style.filter = 'none';
-                document.body.style.opacity = '1';
-            });
-            
-            // كشف تغيير في حالة الرؤية
-            document.addEventListener('visibilitychange', function() {
-                if (document.hidden) {
-                    document.body.style.filter = 'blur(10px)';
-                    document.body.style.opacity = '0.1';
-                    
-                    DevToolsLogger.addLog('visibility_hidden', {
-                        reason: 'potential_screenshot',
-                        timestamp: new Date().toISOString()
-                    });
-                } else {
-                    document.body.style.filter = 'none';
-                    document.body.style.opacity = '1';
-                }
-            });
-        }
-
-        // حماية بـ CSS لمنع لقطات الشاشة
-        function addScreenshotProtection() {
-            const style = document.createElement('style');
-            style.textContent = `
-                @media print {
-                    body * {
-                        visibility: hidden !important;
-                    }
-                    body:before {
-                        content: "Screenshot/Print Protection Active - Content Hidden";
-                        visibility: visible !important;
-                        position: fixed;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        font-size: 2em;
-                        color: red;
-                        z-index: 9999;
-                    }
-                }
-                
-                body {
-                    -webkit-user-select: none;
-                    -moz-user-select: none;
-                    -ms-user-select: none;
-                    user-select: none;
-                    -webkit-touch-callout: none;
-                    -webkit-tap-highlight-color: transparent;
-                }
-                
-                /* حماية من أدوات الالتقاط */
-                @media screen and (-webkit-min-device-pixel-ratio: 0) {
-                    body::before {
-                        content: "";
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        background: transparent;
-                        z-index: -1;
-                        pointer-events: none;
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
-        // نظام الحظر الدائم للموقع
-        const BanSystem = {
-            banKey: 'website_permanent_ban',
-            bannedUsersKey: 'banned_users_list',
-            
-            // إضافة مستخدم لقائمة الحظر
-            addToBanList: function(reason) {
-                const banData = {
-                    banId: this.generateBanId(),
-                    timestamp: new Date().toISOString(),
-                    reason: reason,
-                    userAgent: navigator.userAgent,
-                    fingerprint: this.generateFingerprint(),
-                    ipFingerprint: this.generateIPFingerprint(),
-                    browserFingerprint: this.generateBrowserFingerprint()
-                };
-                
-                try {
-                    // حفظ بيانات الحظر الحالي
-                    localStorage.setItem(this.banKey, JSON.stringify(banData));
-                    
-                    // إضافة للقائمة العامة
-                    const bannedUsers = this.getBannedUsers();
-                    bannedUsers.push(banData);
-                    localStorage.setItem(this.bannedUsersKey, JSON.stringify(bannedUsers));
-                    
-                    // حفظ في IndexedDB للحماية المتقدمة
-                    this.saveToDB(banData);
-                    
-                } catch(e) {
-                    console.warn('Could not save ban data:', e);
-                }
-                
-                return banData.banId;
-            },
-            
-            // التحقق من وجود حظر
-            isBanned: function() {
-                try {
-                    // فحص localStorage
-                    const banData = localStorage.getItem(this.banKey);
-                    if (banData) return JSON.parse(banData);
-                    
-                    // فحص بصمة المتصفح
-                    const currentFingerprint = this.generateFingerprint();
-                    const bannedUsers = this.getBannedUsers();
-                    
-                    for (let user of bannedUsers) {
-                        if (user.fingerprint === currentFingerprint ||
-                            user.browserFingerprint === this.generateBrowserFingerprint()) {
-                            return user;
-                        }
-                    }
-                    
-                    return null;
-                } catch(e) {
-                    return null;
-                }
-            },
-            
-            // الحصول على قائمة المحظورين
-            getBannedUsers: function() {
-                try {
-                    const users = localStorage.getItem(this.bannedUsersKey);
-                    return users ? JSON.parse(users) : [];
-                } catch(e) {
-                    return [];
-                }
-            },
-            
-            // توليد معرف الحظر
-            generateBanId: function() {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                let result = '';
-                for (let i = 0; i < 12; i++) {
-                    result += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                return result;
-            },
-            
-            // توليد بصمة المتصفح
-            generateFingerprint: function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                ctx.textBaseline = 'top';
-                ctx.font = '14px Arial';
-                ctx.fillText('Browser fingerprint', 2, 2);
-                
-                const fingerprint = [
-                    screen.width,
-                    screen.height,
-                    screen.colorDepth,
-                    navigator.language,
-                    navigator.platform,
-                    navigator.cookieEnabled,
-                    navigator.hardwareConcurrency,
-                    new Date().getTimezoneOffset(),
-                    canvas.toDataURL()
-                ].join('|');
-                
-                return this.hashCode(fingerprint);
-            },
-            
-            // توليد بصمة IP (تقريبية)
-            generateIPFingerprint: function() {
-                return this.hashCode(navigator.userAgent + navigator.language + screen.width + screen.height);
-            },
-            
-            // توليد بصمة المتصفح المتقدمة
-            generateBrowserFingerprint: function() {
-                const plugins = Array.from(navigator.plugins).map(p => p.name).join(',');
-                const fonts = this.detectFonts();
-                
-                const fingerprint = [
-                    navigator.userAgent,
-                    navigator.language,
-                    screen.availWidth,
-                    screen.availHeight,
-                    plugins,
-                    fonts,
-                    Intl.DateTimeFormat().resolvedOptions().timeZone
-                ].join('|');
-                
-                return this.hashCode(fingerprint);
-            },
-            
-            // كشف الخطوط المثبتة
-            detectFonts: function() {
-                const testFonts = ['Arial', 'Times New Roman', 'Courier New', 'Helvetica', 'Georgia'];
-                const availableFonts = [];
-                
-                for (let font of testFonts) {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    ctx.font = `12px ${font}`;
-                    const width = ctx.measureText('test').width;
-                    if (width > 0) availableFonts.push(font);
-                }
-                
-                return availableFonts.join(',');
-            },
-            
-            // حساب hash للنص
-            hashCode: function(str) {
-                let hash = 0;
-                for (let i = 0; i < str.length; i++) {
-                    const char = str.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash; // Convert to 32-bit integer
-                }
-                return Math.abs(hash).toString(36);
-            },
-            
-            // حفظ في IndexedDB
-            saveToDB: function(banData) {
-                try {
-                    const request = indexedDB.open('WebsiteBanDB', 1);
-                    
-                    request.onupgradeneeded = function(e) {
-                        const db = e.target.result;
-                        if (!db.objectStoreNames.contains('bans')) {
-                            db.createObjectStore('bans', { keyPath: 'banId' });
-                        }
-                    };
-                    
-                    request.onsuccess = function(e) {
-                        const db = e.target.result;
-                        const transaction = db.transaction(['bans'], 'readwrite');
-                        const store = transaction.objectStore('bans');
-                        store.add(banData);
-                    };
-                } catch(e) {
-                    console.warn('Could not save to IndexedDB:', e);
-                }
-            },
-            
-            // مسح بيانات الحظر (للمطورين فقط)
-            clearBan: function() {
-                try {
-                    localStorage.removeItem(this.banKey);
-                    localStorage.removeItem(this.bannedUsersKey);
-                    
-                    // مسح من IndexedDB
-                    const request = indexedDB.deleteDatabase('WebsiteBanDB');
-                    return true;
-                } catch(e) {
-                    return false;
-                }
-            }
-        };
-
-        // وظائف مساعدة للاستخدام العام
-        function addToBanList(reason) {
-            return BanSystem.addToBanList(reason);
-        }
-
-        function generateBanId() {
-            return BanSystem.generateBanId();
-        }
-
-        function checkBanStatus() {
-            return BanSystem.isBanned();
-        }
-
-        // تشغيل حماية لقطات الشاشة
-        detectScreenshot();
-        preventPrintScreen();
-        preventExternalCapture();
-        addScreenshotProtection();
-
         // تصدير وظائف للاستخدام في وحدة التحكم (لأغراض التشخيص)
         window.DevToolsDebug = {
             getLogs: () => DevToolsLogger.getLogs(),
@@ -752,14 +347,11 @@
             checkStatus: () => ({
                 devToolsOpen,
                 zoom: getAccurateZoomLevel(),
-                banStatus: checkBanStatus(),
                 windowInfo: {
                     inner: { width: window.innerWidth, height: window.innerHeight },
                     outer: { width: window.outerWidth, height: window.outerHeight }
                 }
-            }),
-            // وظيفة مخفية لمسح الحظر (للمطورين فقط)
-            emergencyUnban: () => BanSystem.clearBan()
+            })
         };
     </script>
 </body>
